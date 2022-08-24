@@ -6,7 +6,7 @@ sudo_app="sudo" # if you have configured an askpass for your sudo, you can add a
 # This just kills any previously running openVPN processes
 pgrep openvpn &&
      ($sudo_app -A killall openvpn
-     notify-send "VPN process found. Disconnecting."
+     notify-send "VPN process found. Disconnecting." &&
      exit 1)
 
 # Initialize country names. If mullvad adds more new locations, you can simply
@@ -59,8 +59,8 @@ which dmenu>/dev/null 2>&1 ||
     (echo "Run Launcher not found. Please install either dmenu to use this script" && exit 1)
 
 # Set directory variables
-mullvaddir="$HOME/.mullvad/"
-mullvad_conf_dir="$mullvaddir/mullvad_config_linux"
+mullvaddir=$HOME/.mullvad
+mullvad_conf_dir=$mullvaddir/mullvad_config_linux
 
 # If .mullvad is not found, assume that it has not been installed yet.
 if [[ ! -d $mullvaddir ]]; then
@@ -73,26 +73,19 @@ if [[ ! -d $mullvaddir ]]; then
         the config zip file to your HOME folder." &&  exit 1)
 
     # correctly configure other various OpenVPN files
-    $sudo_app mv "$mullvad_conf_dir/mullvad_userpass.txt" "$mullvaddir/.userpass.txt"
-    $sudo_app mv "$mullvad_conf_dir/mullvad_ca.crt" "$mullvaddir/.ca.crt"
-    $sudo_app mv "$mullvad_conf_dir/update-resolv-conf" "/etc/openvpn/update-resolv-conf"
-    $sudo_app chmod 775 "/etc/openvpn/update-resolv-conf"
+    $sudo_app mv $mullvad_conf_dir/mullvad_userpass.txt $mullvaddir/.userpass.txt
+    $sudo_app mv $mullvad_conf_dir/mullvad_ca.crt $mullvaddir/.ca.crt
+    $sudo_app mv $mullvad_conf_dir/update-resolv-conf /etc/openvpn/update-resolv-conf
+    $sudo_app chmod 775 /etc/openvpn/update-resolv-conf
 
-    # Generate the country directories
-    for country in "${countries[@]}"
+    # Link each config file to the right config, mainly using grep and awk to match the keys
+    for country in ${countries[@]}
     do
-        mkdir $mullvaddir/$country
-    done
+        file_abb=$(echo "$country" | awk -F "_" '{print "_"$NF"_"}')
+        filename=$(echo "$country" | awk -F "_" '{print $1}' )
+        conf_file=$(ls $mullvad_conf_dir/*.conf | grep "$file_abb")
 
-    conf_files=$(ls $mullvad_conf_dir)
-
-    # Link each config file to the right dir, mainly using grep and awk to match the keys
-    for file in $conf_files
-    do
-        file_abb=$(echo "$file" | awk -F "_" '{print "_"$2}')
-        dir=$(ls $mullvaddir | grep "$file_abb")
-
-        mv $mullvad_conf_dir/$file $mullvaddir/$dir
+        mv $conf_file $mullvaddir/$filename
     done
 
     # Remove the empty config directory
@@ -106,10 +99,10 @@ fi
 # Pipe country choices into dmenu and set up openvpn in the background.
 country=$(ls $mullvaddir | dmenu -i -p "Which country would you like to connect to?"  -c -l 20 )
 
-conf=$(ls $mullvaddir/$country/*.conf)
+conf=$(ls $mullvaddir/$country)
 
-ca="$mullvaddir.ca.crt"
-userpass="$mullvaddir.userpass.txt"
+ca=$mullvaddir/.ca.crt
+userpass=$mullvaddir/.userpass.txt
 
 $sudo_app openvpn --config "$conf" \
              --auth-user-pass "$userpass" \
